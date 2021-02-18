@@ -4,7 +4,7 @@ Capture individual video streams from each video call/Zoom participant in real-t
 ## Assumptions
 
 * You are using a tool similar to Zoom in gallery mode and the window is currently open.
-* Each user's video is rectangular and has an aspect ration ~= 1.77 (H/W) -- note that aspect ration is a changeable argument in the ParticipantDetector class.
+* Each user's video is rectangular and has an aspect ratio ~= 1.77 (H/W) -- note that aspect ration is a changeable argument in the ParticipantDetector class.
 
 ## Current limitations
 
