@@ -313,11 +313,13 @@ def test_pipeline_fps(wc, pd, frames = 100):
     print("--- achieved %s fps ---" % fps)
     return fps
 
+
+#TODO: unsorted participant list/self is always user 0 (but hold onto active participant info), publish separate audio, video, and info streams with same topic order, with arrays of participants for each
 def main():
 
     x = WindowCapture(window_title="Zoom Meeting")
     # x.test_fps()
-    detector = PartcipantDetector(x.get_numpy_img(), debug=False, display_box=False)
+    detector = PartcipantDetector(x.get_numpy_img(), debug=True, display_box=False)
     participants = detector.detect()
     # test_pipeline_fps(x,detector)
 
