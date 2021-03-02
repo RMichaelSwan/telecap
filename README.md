@@ -12,6 +12,8 @@ Capture individual video streams from each video call/Zoom participant in real-t
 * Relies on GTK 3.0 being installed on system (**likely only works on Linux/Ubuntu**)
 * Has to activate desired window in order to get a handle on its pixels.
 * Getting a handle on correct window may be adversely affected by system CPU load (may get a handle on incorrect window and thus require increased sleep time). Unable to programmatically wait for desired window to be active and get handle.
+* Resizing your video window during capture will likely cause instability/crashes/missing participants
+* Large video window sizes (e.g. full screen) may cause instability/crashes
 
 # Audio Setup
 
@@ -19,4 +21,5 @@ Audio setup in Linux is not clean. You either need to know too much (i.e. [creat
 
 1. Install pavucontrol if not already installed: `sudo apt-get install pavucontrol`
 2. Open pavucontrol, and navigate to the recording tab.
+![pavucontrol][pavucontrol-example.png]
 3. Run audio setup and follow instructions: `python3 setup_audio.py`

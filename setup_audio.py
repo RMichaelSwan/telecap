@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-"""
-    TODO: Get audio stream
-"""
+    """
+    Sets up your PC to capture audio played to speakers. Refer to README.MD for full instructions.
+    """
 
 import pyaudio
 import wave

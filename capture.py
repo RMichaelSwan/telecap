@@ -3,8 +3,8 @@
 """
     A script to capture the speaker audio and screen
 
-    TODO: Get audio stream
-    TODO: provide video stream
+    TODO: Get ROS audio stream
+    TODO: provide ROS video stream
 """
 
 import numpy as np
@@ -182,7 +182,7 @@ class WindowCapture():
 
 
 class PartcipantDetector():
-    def __init__(self,image, epsilon = 0.01, detect_rate = 1, display_box = False, debug = False,
+    def __init__(self, epsilon = 0.01, detect_rate = 1, display_box = False, debug = False,
         gallery_color_rgba = np.array([26,26,26,255]), active_color_rgba = np.array([35,217,89,255]), 
         crop_percentX = 0.99, crop_percentY = 0.89, aspectRatio = 1.77):        
         """Detects participants in a video call and provides frames/video from 
@@ -195,8 +195,6 @@ class PartcipantDetector():
             occur.
 
         Args:
-            image (ndarray): The RGBA image to work off of.
-                The array values are expected to be readonly.
             epsilon (float, optional): How sensitive the box detector is.
                 A higher value results in boxes with imperfections being detected
                 more often. Defaults to 0.1.
@@ -218,7 +216,6 @@ class PartcipantDetector():
             aspectRatio (float, optional): The predicted aspect ratio of 
                 participant videos. Used to filter out false positives. Defaults to 1.77.
         """        
-        self.img_arr = image
         self.epsilon = epsilon
         self.detect_rate = detect_rate
         self.display_box = display_box
@@ -229,25 +226,32 @@ class PartcipantDetector():
         self.crop_percentY = crop_percentY
         self.aspectRatio = aspectRatio
 
-    def detect_new(self,image):
-        self.img_arr = image
-        self.detect()
+    def detect(self, image):
+        """Do a detection on the provided image.
 
-    def detect(self):
+        Args:
+             image (ndarray): The RGBA image to work off of.
+                The array is considered mutable while the internal array values 
+                are expected to be readonly.
+
+        Returns:
+            list[ndarray]: A list of participant sub-images if any, else empty list.
+            int: Index of the active participant in previous list
+        """
         #crop out extra bars around window edges
-        self.img_arr = self.img_arr[0:int(self.img_arr.shape[0]*self.crop_percentY),
-                                    0:int(self.img_arr.shape[1]*self.crop_percentX),...] 
-        if self.debug: print(f"Cropped image array shape: {self.img_arr.shape}")
-        img = array_to_cv2(self.img_arr,cv2.COLOR_RGB2BGR)
-        masked = self.img_arr.copy()
+        image = image[0:int(image.shape[0]*self.crop_percentY),
+                                    0:int(image.shape[1]*self.crop_percentX),...] 
+        if self.debug: print(f"Cropped image array shape: {image.shape}")
+        img = array_to_cv2(image,cv2.COLOR_RGB2BGR)
+        masked = image.copy()
         
-        gal_mask = (self.img_arr == self.gallery_color).all(-1)
+        gal_mask = (image == self.gallery_color).all(-1)
         
         masked[gal_mask] = 255
         masked[np.logical_not(gal_mask)] = 0
         
         ##We can find the active partipant using the color...
-        # active_mask = (self.img_arr == self.active_color).all(-1)
+        # active_mask = (image == self.active_color).all(-1)
         # masked[...,:4][active_mask] = [0,0,0,0]
         
         #reference: https://stackoverflow.com/a/11427501/5715374
@@ -256,8 +260,8 @@ class PartcipantDetector():
 
         _,thresh = cv2.threshold(gray,127,255,1)
         contours,_ = cv2.findContours(thresh,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours,key=cv2.contourArea,reverse=True)
-        rects = [] # a list of found rects in descending (greatest first) area order
+
+        rects = [] # a list of found rects and their area
         
         #find the interesting rectangles
         for cnt in contours:
@@ -273,25 +277,45 @@ class PartcipantDetector():
                     if self.debug: print(f"rejected aspect ratio of {ar}")
                     continue
                 if self.debug: print(f"Aspect ratio = {ar}")
-                rects.append(cnt)
+                rects.append((cnt,area))
 
-        first = True
-        color = (0,0,255)
-        display = False
+
+        # Find the active participant--they should have the largest box area due to their window highlight
+        # contours_active = sorted(rects,key=cv2.contourArea,reverse=True) # an alternate method that always puts the active participant first by ignoring original order
+        # active_participant_index = sorted(inds,key=areas, reverse=True)[0]
         participants = []
-        for rect in rects:
-            x,y,w,h = cv2.boundingRect(rect)
+        active_participant_index = self._get_active_rect_(rects)
+        for i in range(len(rects)):
+            x,y,w,h = cv2.boundingRect(rects[i][0])
             participants.append(img[y:y+h, x:x+w]) #crop participant image to bounding box.
-            #the first participant has the largest area and is thus most likely the active participant
-            if first: 
-                first = False
-                color = (0,255,0)
-            else:
-                color = (0,0,255)
             if self.display_box:
-                cv2.drawContours(img,[rect],0,color,2)
+                if i == active_participant_index: 
+                    color = (0,255,0)
+                else:
+                    color = (0,0,255)
+                cv2.drawContours(img,[rects[i][0]],0,color,2)
+                
         if self.debug: print(f"Detected {len(rects)} participants.")
-        return participants
+        return participants, active_participant_index
+
+    def _get_active_rect_(self, contours):
+        """Find the active contour in a list. The current algorithm makes use of
+        the largest window area, which works on the assumption that the active 
+        participant is highlighted and thus has a larger detected window size.
+
+        Args:
+            contours (list[(contour,int)]): A list containing tuples of contours with their associated area
+
+        Returns:
+            int: Index of the active contour in the list of contours
+        """
+        greatestArea = 0
+        activeInd = -1
+        for i, cont in enumerate(contours):
+            if abs(cont[1]) > greatestArea:
+                greatestArea = cont[1]
+                activeInd = i
+        return activeInd
 
 def test_pipeline_fps(wc, pd, frames = 100):    
     """Gives an estimate of the frames per second capture rate
@@ -313,22 +337,41 @@ def test_pipeline_fps(wc, pd, frames = 100):
     print("--- achieved %s fps ---" % fps)
     return fps
 
-
-#TODO: unsorted participant list/self is always user 0 (but hold onto active participant info), publish separate audio, video, and info streams with same topic order, with arrays of participants for each
-def main():
-
-    x = WindowCapture(window_title="Zoom Meeting")
+def test():
+    x = WindowCapture(window_title="Zoom Meeting", activation_delay=0.1)
     # x.test_fps()
-    detector = PartcipantDetector(x.get_numpy_img(), debug=True, display_box=False)
-    participants = detector.detect()
+    detector = PartcipantDetector(debug=True, display_box=False)
     # test_pipeline_fps(x,detector)
 
+    while(True):
+        participants = detector.detect(x.get_numpy_img())
+        for i, part in enumerate(participants):
+            cv2.imshow(f"Participant {i}",part)
+        
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    for i, part in enumerate(participants):
-        cv2.imshow(f"Participant {i}",part)
-    
-    cv2.waitKey(0)
+    # cv2.waitKey(0)
     cv2.destroyAllWindows()
+    x = None
+
+#TODO: publish separate audio, video, and info streams with same topic order, with arrays of participants for each
+def main():
+
+    x = WindowCapture(window_title="Zoom Meeting", activation_delay=0.1)
+    detector = PartcipantDetector(debug=False, display_box=True)
+
+    while(True):
+        participants, activeInd = detector.detect(x.get_numpy_img())
+        for i, part in enumerate(participants):
+            cv2.imshow(f"Participant {i}",part)
+        
+        #TODO insert ROS code and publish here
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+    detector = None
     x = None
 
 if __name__ == "__main__":
