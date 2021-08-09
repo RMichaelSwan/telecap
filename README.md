@@ -21,5 +21,5 @@ Audio setup in Linux is not clean. You either need to know too much (i.e. [creat
 
 1. Install pavucontrol if not already installed: `sudo apt-get install pavucontrol`
 2. Open pavucontrol, and navigate to the recording tab.
-![pavucontrol][pavucontrol-example.png]
+![pavucontrol][./pavucontrol-example.png]
 3. Run audio setup and follow instructions: `python3 setup_audio.py`
